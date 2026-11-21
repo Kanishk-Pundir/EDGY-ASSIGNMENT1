@@ -13,14 +13,19 @@ rows = [{"battery_v": round(float(rng.uniform(3.4, 4.2)), 3),
          "age_months": int(rng.integers(0, 37))} for _ in range(400)]
 
 s = requests.Session()
+s.get(url + "/health", timeout=30)             # warm up the connection first
+
 t0 = time.perf_counter()
 for r in rows:
     s.post(url + "/predict", json=r, timeout=30)
 t_single = time.perf_counter() - t0
 
-t0 = time.perf_counter()
-resp = requests.post(url + "/predict_batch", json={"rows": rows}, timeout=60)
-t_batch = time.perf_counter() - t0
+times = []
+for _ in range(5):                             # repeat: the first call may include warm-up
+    t0 = time.perf_counter()
+    resp = s.post(url + "/predict_batch", json={"rows": rows}, timeout=60)
+    times.append(time.perf_counter() - t0)
+    print("  batch call:", f"{times[-1]:.3f} s", resp.json()["timings_ms"])
+t_batch = sorted(times)[len(times) // 2]       # median
 
-print(f"400 single calls: {t_single:.2f} s    one batch call: {t_batch:.3f} s    ratio: {t_single / t_batch:.0f}x")
-print("batch server timings (ms):", resp.json()["timings_ms"])
+print(f"400 single calls: {t_single:.2f} s    one batch call (median of 5): {t_batch:.3f} s    ratio: {t_single / t_batch:.0f}x")
