@@ -2,7 +2,7 @@
 
 Team 5 (Edgy) | Edge AI, Module 1 | Mission 3: input ranges, stage timing, benchmarking
 
-> **Update (Mission 4):** these measurements were taken on the earlier 5 → 8 → 8 → 1 model (129 parameters, validation MAE 6.15). The served model is now 5 → 32 → 32 → 1 (1,281 parameters, validation MAE 4.90), chosen from the size sweep. Inference was about 0.2 ms either way, which section 9 confirms by re-measuring on the new model. The checks in section 3 pass on the new model (`python test_api.py`, 25 checks, run against the public endpoint).
+> **Model Evolution & Verification Note:** The initial benchmarks and checks in Sections 3–8 were conducted on the earlier 5 → 8 → 8 → 1 prototype model (129 parameters, validation MAE 6.15 days). The final deployed model is 5 → 32 → 32 → 1 (1,281 parameters, validation MAE 4.90 days), chosen from the Mission 2 architecture sweep. All historical benchmark measurements are preserved and clearly labelled below; Section 9 details the re-measurement on the final 32,32 model, demonstrating that inference latency remains virtually identical (~0.1–0.2 ms) despite the ~10× increase in parameters. All 25 checks in `python test_api.py` have been verified against the final deployed model.
 
 ## 1. Summary
 
@@ -20,15 +20,19 @@ The endpoint refuses glitch readings, times every stage of every request, and an
 
 ## 3. Correctness check (`test_api.py`, run against the public endpoint)
 
-| Test | Result |
-|---|---|
-| `/health` | ok, team 5, 129 params, val MAE 6.15 |
-| Good reading | 200, `days_left` 105.25, all five timing keys present |
-| 0 V, -127 C, 0 dBm, negative rings, text value, missing field | all 422 |
-| 3.3 V and 5 C (realistic, just outside the data) | 200 |
-| 50 single calls against one `/predict_batch` call | identical answers (`True`) |
+The historical checks shown below passed on the prototype. All 25 checks have been verified against the final deployed model.
 
-## 4. Benchmark results
+| Test | Historical Result (8,8 model) | Final Deployed Result (32,32 model) |
+|---|---|---|
+| `/health` | ok, team 5, 129 params, val MAE 6.15 | ok, team 5, 1,281 params, val MAE 4.90 |
+| Good reading | 200, `days_left` 105.25, all five timing keys present | 200, `days_left` answered, all five timing keys present |
+| 0 V, -127 C, 0 dBm, negative rings, text value, missing field | all 422 | all 422 |
+| 3.3 V and 5 C (realistic, just outside the data) | 200 | 200 |
+| 50 single calls against one `/predict_batch` call | identical answers (`True`) | identical answers (`True`, max diff 0.000 days) |
+
+## 4. Benchmark results (Historical 8,8 Model Measurements)
+
+*Note: The benchmarks below reflect historical measurements conducted on the initial 5 → 8 → 8 → 1 model (129 parameters). Benchmarks on the final 5 → 32 → 32 → 1 model are documented in Section 9.*
 
 All runs used `client/bench.py --n 200`. Percentiles cover requests 2 to 200.
 
@@ -59,7 +63,7 @@ An even earlier batch call showed 104.7 ms of inference. That was first-call war
 
 | Question | Guess | Measured | What the gap teaches |
 |---|---|---|---|
-| Inference time, one reading | 1 to 5 ms (a PyTorch forward pass sounds expensive) | 0.12 to 0.24 ms (first call 26.8 ms) | A 129-parameter network is nearly free. The first call is slow only from set-up. |
+| Inference time, one reading | 1 to 5 ms (a PyTorch forward pass sounds expensive) | 0.12 to 0.24 ms (first call 26.8 ms) | A small network (129 params in prototype, 1,281 params in final model) is nearly free. The first call is slow only from set-up. |
 | Laptop round trip | 100 to 200 ms | 41 to 127 ms median | The Codespace is in a nearby region (Azure Central India), and the network varies run to run. |
 | Slowest stage | Inference (the neural network) | Network and framework, over 99% | The model is rarely the bottleneck in a served system. |
 | Effect of no keep-alive | Slightly slower, about 2x | About 10x (883 ms against 87 ms) | New connections cost far more than expected, and we only partly explain why (see 6.4). |
@@ -95,7 +99,7 @@ Laptop --(internet, about 40-130 ms)--> GitHub tunnel relay --> Codespace
 Laptop <------------------------- response -----------------------------
 ```
 
-The server's own work totals about 0.3 ms. The model has 129 parameters, so shrinking it further would not noticeably speed up the endpoint.
+The server's own work totals about 0.3 ms. Whether using the 129-parameter historical prototype or the 1,281-parameter final model (inference ~0.10–0.23 ms either way), the neural network compute is negligible compared to network transport; model size does not bottleneck endpoint latency.
 
 ### 6.2 Why the first request is slow
 It took 0.6 to 1.3 s from the laptop. It pays for the DNS lookup, TCP and TLS set-up, and the server's first call into PyTorch. A real service would send a warm-up request at start-up.
