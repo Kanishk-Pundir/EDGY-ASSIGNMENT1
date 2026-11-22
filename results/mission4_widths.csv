@@ -1,0 +1,6 @@
+w,params,bytes_f32,bytes_int8,fits_sram_f32,fits_sram_int8,fits_psram_f32,fits_psram_int8,macs
+32,1281,5124,1281,True,True,True,True,1216
+128,17409,69636,17409,True,True,True,True,17152
+256,67585,270340,67585,True,True,True,True,67072
+512,266241,1064964,266241,False,True,True,True,265216
+2048,4210689,16842756,4210689,False,False,False,True,4206592

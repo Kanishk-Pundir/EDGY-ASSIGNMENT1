@@ -1,13 +1,14 @@
 """
-app/main.py -- STARTER battery API. Look for TODO.
+app/main.py -- Team 5 (Edgy) doorbell battery API.
 
     uvicorn app.main:app --host 0.0.0.0 --port 8000
 
-GET  /health          -> {"status": "ok", "team": 7, "params": 1281, "val_mae": 3.4}
+GET  /health          -> {"status": "ok", "team": 5, "params": 1281, "val_mae": 4.88}
 GET  /model_info      -> the per-layer table: params, bytes, MACs, and whether it fits the doorbell
 POST /predict         one reading  -> {"days_left": 52.1, "timings_ms": {...}}
 POST /predict_batch   {"rows": [reading, ...]} -> {"days_left": [...], "timings_ms": {...}}
-A reading that is out of range gets HTTP 422 with the reason, never a guess.
+A reading that is out of range, missing, non-numeric, NaN or infinite gets HTTP 422 with
+the reason, never a guess.
 """
 import json
 import time
@@ -16,9 +17,10 @@ import numpy as np
 import torch
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.model import FEATURES, BatteryNet
+from app.stats import layer_table
 
 cfg = json.load(open("model/config.json"))
 net = BatteryNet(tuple(cfg["hidden"]))
@@ -27,11 +29,24 @@ net.eval()
 torch.set_num_threads(1)
 MU, SD = np.array(cfg["mu"], np.float32), np.array(cfg["sd"], np.float32)
 N_PARAMS = sum(p.numel() for p in net.parameters())
+MODEL_INFO = layer_table(net)          # the network never changes while serving: count it once
+assert MODEL_INFO["total_params"] == N_PARAMS, "layer_table disagrees with PyTorch's count"
+
+# Warm-up: PyTorch's first forward pass does one-time set-up (Mission 3 measured hundreds of ms).
+# Pay it here at start-up, for one row and for a batch, so no real request pays it.
+with torch.no_grad():
+    for n in (1, 64):
+        net(torch.zeros(n, len(FEATURES)))
+
 
 class Reading(BaseModel):
     # Mission 3: limits come from what a real sensor can report, NOT from the training data's
     # min/max, so a real reading just outside the data is still answered while glitches
     # (0 V, -127 C, 0 dBm) are refused with HTTP 422.
+    # allow_inf_nan=False: a dead sensor can send NaN or Infinity. Pydantic accepts those in a
+    # float field by default, and NaN slips past ge/le checks, so refuse them explicitly.
+    model_config = ConfigDict(allow_inf_nan=False)
+
     battery_v: float = Field(ge=2.5, le=4.5)        # Li-ion cell, ~3.0-4.2 V in normal use
     temp_c: float = Field(ge=-40, le=85)            # typical electronics operating range
     rings_per_day: float = Field(ge=0, le=200)      # a count: cannot be negative
@@ -49,54 +64,9 @@ ms = lambda t0: round((time.perf_counter() - t0) * 1000, 3)
 
 @app.get("/model_info")
 def model_info():
-    # TODO Mission 2 + 4: return your per-layer table, worked out FROM THE NETWORK (net.net),
-    # not typed in by hand, so it stays right if you change the layer sizes. Exactly these keys:
-    # {"layers": [{"name": "linear1", "in": 5, "out": 32, "params": ..., "bytes_f32": ..., "macs": ...}, ...],
-    #  "total_params": ..., "total_bytes_f32": ..., "total_bytes_int8": ..., "total_macs": ...,
-    #  "fits_300kb_sram_f32": true/false, "fits_300kb_sram_int8": true/false}
-    # Count only the Linear layers (ReLU has no parameters). Clue: a Linear layer m has
-    # m.in_features and m.out_features.
-    layers = []
-
-    total_params = 0
-    total_bytes_f32 = 0
-    total_macs = 0
-
-    for layer in net.net:
-        if isinstance(layer, torch.nn.Linear):
-            params = (layer.in_features * layer.out_features + layer.out_features)
-
-            bytes_f32 = params * 4
-
-            macs = layer.in_features * layer.out_features
-
-            total_params += params
-            total_bytes_f32 += bytes_f32
-            total_macs += macs
-
-            layers.append({
-                "name": f"linear{len(layers) + 1}",
-                "in": layer.in_features,
-                "out": layer.out_features,
-                "params": params,
-                "bytes_f32": bytes_f32,
-                "macs": macs
-            })
-
-    total_bytes_int8 = total_params
-
-    fits_f32 = total_bytes_f32 <= 300 * 1024
-    fits_int8 = total_bytes_int8 <= 300 * 1024
-
-    return {
-    "layers": layers,
-    "total_params": total_params,
-    "total_bytes_f32": total_bytes_f32,
-    "total_bytes_int8": total_bytes_int8,
-    "total_macs": total_macs,
-    "fits_300kb_sram_f32": fits_f32,
-    "fits_300kb_sram_int8": fits_int8
-    }
+    # Missions 2 + 4: computed from the network's own layers by app/stats.py (not typed in),
+    # so it stays right if the layer sizes change. mission4.py uses the same function.
+    return MODEL_INFO
 
 
 @app.get("/health")
@@ -110,7 +80,10 @@ async def run(request: Request, schema):
     try:
         data = schema.model_validate_json(await request.body())
     except ValidationError as e:
-        return JSONResponse(status_code=422, content={"error": "bad reading", "detail": json.loads(e.json())})
+        # include_input=False: the rejected value may be NaN/Infinity, which JSON cannot carry,
+        # so echoing it back would crash the error reply itself (HTTP 500).
+        detail = json.loads(e.json(include_input=False, include_url=False))
+        return JSONResponse(status_code=422, content={"error": "bad reading", "detail": detail})
     t["parse"] = ms(t0)
     rows = data.rows if isinstance(data, Batch) else [data]
 
@@ -133,11 +106,22 @@ async def run(request: Request, schema):
     return body
 
 
-@app.post("/predict")
+# The endpoints read the raw body (so parse can be timed), which hides the body from /docs.
+# openapi_extra puts the schema back, so readings can be tried by hand at /docs.
+def _body(schema):
+    return {"requestBody": {"required": True, "content": {"application/json": {"schema": schema}}}}
+
+
+READING_SCHEMA = Reading.model_json_schema()
+BATCH_SCHEMA = {"type": "object", "required": ["rows"],
+                "properties": {"rows": {"type": "array", "items": READING_SCHEMA}}}
+
+
+@app.post("/predict", openapi_extra=_body(READING_SCHEMA))
 async def predict(request: Request):
     return await run(request, Reading)
 
 
-@app.post("/predict_batch")
+@app.post("/predict_batch", openapi_extra=_body(BATCH_SCHEMA))
 async def predict_batch(request: Request):
     return await run(request, Batch)
