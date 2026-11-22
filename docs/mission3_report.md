@@ -60,10 +60,10 @@ An even earlier batch call showed 104.7 ms of inference. That was first-call war
 | Question | Guess | Measured | What the gap teaches |
 |---|---|---|---|
 | Inference time, one reading | 1 to 5 ms (a PyTorch forward pass sounds expensive) | 0.12 to 0.24 ms (first call 26.8 ms) | A 129-parameter network is nearly free. The first call is slow only from set-up. |
-| Laptop round trip | 100 to 200 ms | 41 to 87 ms median | The Codespace is in a nearby region (Azure Central India), and the network varies run to run. |
+| Laptop round trip | 100 to 200 ms | 41 to 127 ms median | The Codespace is in a nearby region (Azure Central India), and the network varies run to run. |
 | Slowest stage | Inference (the neural network) | Network and framework, over 99% | The model is rarely the bottleneck in a served system. |
 | Effect of no keep-alive | Slightly slower, about 2x | About 10x (883 ms against 87 ms) | New connections cost far more than expected, and we only partly explain why (see 6.4). |
-| Localhost round trip | About 5 ms | 1.8 ms median | Framework overhead was still about 7x the model's compute. |
+| Localhost round trip | About 5 ms | 1.6 ms median |	HTTP and framework overhead was still about 6x the server's own work. |
 | 400 singles against one batch | About 10x | 45x (cold batch), 166x (warm batch) | Per-request overhead dominates, so batching pays far more than the arithmetic alone suggests. |
 
 
