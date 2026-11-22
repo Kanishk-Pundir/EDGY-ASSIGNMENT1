@@ -13,9 +13,9 @@ Train a small neural network that predicts `days_left` of a doorbell battery fro
 | 1. Data and baselines | Done (`train.py`) | Glitch rule drops 24 rows (battery 0 V, temp -127 C, RSSI 0 dBm). Baselines on our split: mean about 57 days MAE, linear about 23 days MAE. |
 | 2. Normalisation, model, `/model_info` | Done in code | Normalisation uses training rows only. `/model_info` is computed from the network, not typed in. **No model-size sweep or plots are in the repo** (see section 7). |
 | 3. Ranges, timing, benchmarks | Done | See `docs/mission3_report.md` and `results/`. |
-| 4. Would it fit in the doorbell? | **Yours** | See section 6. |
+| 4. Would it fit in the doorbell? | Done | See docs/mission4_report.md and mission4.py. |
 
-**Current model:** hidden layers 8,8 (5 → 8 → 8 → 1), **129 params**, 112 MACs, 516 bytes as float32, 129 bytes as int8, validation MAE 6.15 days. Normalisation values are stored in `model/config.json`.
+**Current model:** hidden layers 32,32 (5 → 32 → 32 → 1), **1281 params**, 1216 MACs, 5124 bytes as float32, 1281 bytes as int8, validation MAE 4.88 days Normalisation values are stored in `model/config.json`.
 
 ## 3. Repo layout
 
@@ -64,7 +64,7 @@ Everything should print OK or True, ending with `batch matches 50 singles: True`
 `train.py` is only needed if `model/` is missing or you change the model size:
 
 ```
-python train.py --team 5 --hidden 8,8
+python train.py --team 5 --hidden 32,32
 ```
 
 ## 5. The online endpoint (Codespace)
@@ -110,7 +110,7 @@ Counting rule: a `Linear(a, b)` layer has a×b weights plus b biases, a×b MACs 
 ## 8. Useful commands
 
 ```
-python train.py --team 5 --hidden 8,8 --epochs 1500
+python train.py --team 5 --hidden 32,32 --epochs 1500
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 python test_api.py [URL]
 python client/bench.py --url <URL> --n 200 [--no-keepalive]

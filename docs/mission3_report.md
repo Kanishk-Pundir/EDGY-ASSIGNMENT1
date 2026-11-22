@@ -2,6 +2,8 @@
 
 Team 5 (Edgy) | Edge AI, Module 1 | Mission 3: input ranges, stage timing, benchmarking
 
+> **Update (Mission 4):** these measurements were taken on the earlier 5 → 8 → 8 → 1 model (129 parameters, validation MAE 6.15). The served model is now 5 → 32 → 32 → 1 (1,281 parameters, validation MAE 4.88), chosen from the size sweep. Inference was about 0.2 ms either way, so the conclusions about where the time goes are unchanged. The checks in section 3 pass on the new model (`python test_api.py`, 25 checks).
+
 ## 1. Summary
 
 The endpoint refuses glitch readings, times every stage of every request, and answers batch calls identically to single calls. The model's own work takes about 0.3 ms per request. From a laptop, a request takes 41 to 87 ms, so more than 99% of the time is network and framework overhead, not the model.
@@ -111,7 +113,7 @@ The singles pay the network round trip 400 times (about 91 ms each). The batch p
 
 ## 7. Limits of these measurements
 
-- Our home router's DNS sometimes refused lookups and crashed one benchmark run. [EDIT: say what you did about it, e.g. changed DNS or used a hotspot.]
+- Our home router's DNS sometimes refused lookups and crashed one benchmark run. That run produced no results file; every number in section 4 comes from a complete 200-request run saved in `results/`.
 - Network speed changed between runs (41 ms and 87 ms medians), so we report both.
 - p99 over 200 requests rests on the two slowest requests, so it is only indicative.
 - The ranges were chosen from typical sensor limits, not from a datasheet.
@@ -121,5 +123,6 @@ The singles pay the network round trip 400 times (about 91 ms each). The batch p
 - `results/bench_20261121_232253.csv`: run A (laptop, keep-alive)
 - `results/bench_20261121_234806.csv`: run B (laptop, keep-alive)
 - `results/bench_20261121_235107.csv`: laptop, no keep-alive
-- `results/bench_20261121_182156.csv`: inside the Codespace (the clock is UTC)
+- Inside the Codespace (localhost) run: the CSV was saved on the Codespace and not copied into `results/`; the numbers in section 4 were read from its printed summary.
+- `results/bench_20261121_233137.csv`: an additional laptop run (median round trip 623 ms, `server_total` 0.36 ms). We did not record whether it used keep-alive, so it is not used in the tables above.
 - `test_api.py`, `batch_test.py`, `handshake_test.py`: scripts that produced the tables above
