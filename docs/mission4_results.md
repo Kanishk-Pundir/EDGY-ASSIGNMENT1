@@ -2,7 +2,7 @@
 
 SRAM budget: 300 KB read as 300 x 1024 = 307,200 bytes. PSRAM: 8 MB = 8,388,608 bytes.
 
-## 1. Our model: 5 -> 32 -> 32 -> 1 (validation MAE 4.88 days)
+## 1. Our model: 5 -> 32 -> 32 -> 1 (validation MAE 4.9 days)
 
 | Layer | in | out | params | bytes f32 | bytes int8 | MACs |
 |---|---|---|---|---|---|---|
@@ -58,6 +58,7 @@ Assumption: 240 MHz, one core. Cycles per float32 MAC from Espressif's ESP-DSP b
 
 | Benchmark file | round trip p50 | server_total p50 | inference p50 | round trip / on-board |
 |---|---|---|---|---|
+| bench_20261121_181159.csv | 1.6 ms | 0.208 ms | 0.118 ms | 31x |
 | bench_20261121_232253.csv | 40.7 ms | 0.312 ms | 0.199 ms | 785x |
 | bench_20261121_233137.csv | 622.6 ms | 0.355 ms | 0.222 ms | 11,998x |
 | bench_20261121_234806.csv | 87.4 ms | 0.362 ms | 0.230 ms | 1,685x |

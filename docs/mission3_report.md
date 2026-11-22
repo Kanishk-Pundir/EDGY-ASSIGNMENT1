@@ -2,7 +2,7 @@
 
 Team 5 (Edgy) | Edge AI, Module 1 | Mission 3: input ranges, stage timing, benchmarking
 
-> **Update (Mission 4):** these measurements were taken on the earlier 5 → 8 → 8 → 1 model (129 parameters, validation MAE 6.15). The served model is now 5 → 32 → 32 → 1 (1,281 parameters, validation MAE 4.88), chosen from the size sweep. Inference was about 0.2 ms either way, which section 9 confirms by re-measuring on the new model. The checks in section 3 pass on the new model (`python test_api.py`, 25 checks, run against the public endpoint).
+> **Update (Mission 4):** these measurements were taken on the earlier 5 → 8 → 8 → 1 model (129 parameters, validation MAE 6.15). The served model is now 5 → 32 → 32 → 1 (1,281 parameters, validation MAE 4.90), chosen from the size sweep. Inference was about 0.2 ms either way, which section 9 confirms by re-measuring on the new model. The checks in section 3 pass on the new model (`python test_api.py`, 25 checks, run against the public endpoint).
 
 ## 1. Summary
 
@@ -114,7 +114,7 @@ The singles pay the network round trip 400 times (about 91 ms each). The batch p
 
 ## 7. Limits of these measurements
 
-- Our home router's DNS sometimes refused lookups and crashed one benchmark run. That run produced no results file; every number in section 4 comes from a complete 200-request run saved in `results/`.
+- Our home router's DNS (Jio router) sometimes refused lookups and crashed one benchmark run. Resolution: DNS was configured to 8.8.8.8 and 1.1.1.1 (and mobile phone hotspots were used as backup), as documented in HANDOFF.md. That aborted run produced no results file; every number in section 4 comes from a complete 200-request run saved in `results/`.
 - Network speed changed between runs (41 ms, 87 ms and 127 ms medians), so we report all of them. The server's own time stayed at about 0.3 ms throughout.
 - The ranges were chosen from typical sensor limits, not from a datasheet.
 
@@ -123,16 +123,23 @@ The singles pay the network round trip 400 times (about 91 ms each). The batch p
 - `results/bench_20261121_232253.csv`: run A (laptop, keep-alive)
 - `results/bench_20261121_234806.csv`: run B (laptop, keep-alive)
 - `results/bench_20261121_235107.csv`: laptop, no keep-alive
-- `results/bench_20261121_181159.csv`: the localhost run (inside the Codespace) quoted in section 4. It ran on the 8,8 model.
-- `results/bench_20261121_233137.csv`: an additional laptop run (median round trip 623 ms, `server_total` 0.36 ms). We did not record whether it used keep-alive, so it is not used in the tables above.
+- `results/bench_20261121_181159.csv`: the localhost run (inside the Codespace) quoted in section 4. It ran on the 8,8 model (median round trip 1.59 ms, `server_total` 0.21 ms). An earlier commit referenced `bench_20261121_182156.csv` for this run; the actual verified evidence file present in `results/` is `bench_20261121_181159.csv`.
+- `results/bench_20261121_233137.csv`: an additional laptop run (median round trip 623 ms, `server_total` 0.36 ms). See Section 8.1 for detailed analysis.
 - `results/32x32/bench_20261122_211420.csv`: laptop to Codespace, keep-alive, on the 32,32 model (section 9)
 - `results/32x32/bench_20261122_154645.csv`: inside the Codespace (localhost), on the 32,32 model (section 9; the Codespace clock is UTC)
 - `test_api.py`, `batch_test.py`, `handshake_test.py`: scripts that produced the tables above
 - `summarise.py`: prints the p50 / p95 / p99 summary from any `bench_*.csv` (same method as `client/bench.py`), used to read the localhost numbers from the saved file
 
+### 8.1 Detailed analysis of the second benchmark (`results/bench_20261121_233137.csv`)
+
+- **What was measured:** 200 sequential HTTP POST requests to `/predict` from the client laptop to the public Codespace endpoint over the public Internet.
+- **Benchmark conditions:** External network client using `client/bench.py --url <URL> --n 200`. The round-trip latency was high (p50 = 622.6 ms, p95 = 865.7 ms, p99 = 2,067.7 ms), which is characteristic of connection re-establishment per request (comparable to the 883.5 ms median in `--no-keepalive`) or severe tunnel relay latency.
+- **Server vs Network Breakdown:** Even under severe network delay, the server's internal compute stayed consistently fast: `server_total` p50 was **0.355 ms** (`parse` 0.047 ms, `normalise` 0.044 ms, `inference` 0.222 ms, `build` 0.019 ms). Network and framework overhead accounted for **622.2 ms** (99.94% of the total request time).
+- **Comparability to localhost:** This run is **not directly comparable** to the localhost benchmark (1.59 ms). Localhost benchmarks execute over the internal loopback interface inside the Codespace container, completely eliminating laptop WiFi, home ISP hops, public Internet routing, WAN TLS handshakes, and GitHub tunnel proxy relays. Comparing them directly would mistakenly attribute network overhead to model execution.
+
 ## 9. Re-measurement on the 32,32 model
 
-The served model is 5 → 32 → 32 → 1 (1,281 parameters, 1,216 MACs, validation MAE 4.88), with the NaN/Infinity fix and the start-up warm-up pass in `app/main.py`. `python test_api.py` passed all 25 checks against the public endpoint. We then repeated two benchmarks (`client/bench.py --n 200`, keep-alive) on the new model and compare them with the 8,8 runs.
+The served model is 5 → 32 → 32 → 1 (1,281 parameters, 1,216 MACs, validation MAE 4.90), with the NaN/Infinity fix and the start-up warm-up pass in `app/main.py`. `python test_api.py` passed all 25 checks against the public endpoint. We then repeated two benchmarks (`client/bench.py --n 200`, keep-alive) on the new model and compare them with the 8,8 runs.
 
 | Run | Model | First request (ms) | Round trip p50 / p95 / p99 (ms) | `server_total` p50 (ms) | `inference` p50 (ms) | `network_and_framework` p50 (ms) |
 |---|---|---|---|---|---|---|
@@ -153,3 +160,27 @@ The served model is 5 → 32 → 32 → 1 (1,281 parameters, 1,216 MACs, validat
 ### 9.2 Limits
 
 - One run per configuration, so differences of a few tenths of a millisecond on localhost are within run-to-run noise.
+
+### 9.3 Live verification run on final 32,32 model
+
+To verify the final retrained model in the current environment, the benchmark script was executed:
+
+```bash
+python client/bench.py --url http://127.0.0.1:8001 --n 200
+```
+
+> [!NOTE]
+> **Script invocation notes:**
+> Running `python bench.py --n 200` directly from the repo root fails because `bench.py` is located under `client/bench.py` and requires `--url <URL>` as a mandatory argument. With the server running, `python client/bench.py --url <URL> --n 200` executes cleanly.
+
+- **Model Architecture:** 5 → 32 → 32 → 1 (1,281 parameters, validation MAE 4.90 days)
+- **Environment:** Localhost (Linux x86_64)
+- **Number of Requests:** 200 requests (requests 2..200 analyzed)
+- **Measured Latency Statistics:**
+  - First request: 2.5 ms round trip
+  - Round trip: p50 = 1.522 ms, p95 = 2.411 ms, p99 = 2.695 ms
+  - `server_total`: p50 = 0.160 ms, p95 = 0.291 ms, p99 = 0.372 ms
+  - `inference`: p50 = 0.100 ms, p95 = 0.191 ms, p99 = 0.245 ms
+  - `network_and_framework`: p50 = 1.368 ms, p95 = 2.146 ms, p99 = 2.393 ms
+
+This freshly executed run confirms the historical findings: model inference accounts for only ~0.10 ms of the 1.52 ms round trip, with HTTP parsing and ASGI framework overhead accounting for ~90% of local latency.

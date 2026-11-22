@@ -11,11 +11,11 @@ Train a small neural network that predicts `days_left` of a doorbell battery fro
 | Mission | Status | Notes |
 |---|---|---|
 | 1. Data and baselines | Done (`train.py`) | Glitch rule drops 24 rows (battery 0 V, temp -127 C, RSSI 0 dBm). Baselines on our split: mean about 57 days MAE, linear about 23 days MAE. |
-| 2. Normalisation, model, `/model_info` | Done in code | Normalisation uses training rows only. `/model_info` is computed from the network, not typed in. **No model-size sweep or plots are in the repo** (see section 7). |
+| 2. Normalisation, model, `/model_info` | Done | Normalisation uses training rows only. `/model_info` is computed from the network, not typed in. Model-size sweep and plots are documented in `docs/mission1_2_report.md` and `plots/`. |
 | 3. Ranges, timing, benchmarks | Done | See `docs/mission3_report.md` and `results/`. |
 | 4. Would it fit in the doorbell? | Done | See docs/mission4_report.md and mission4.py. |
 
-**Current model:** hidden layers 32,32 (5 → 32 → 32 → 1), **1281 params**, 1216 MACs, 5124 bytes as float32, 1281 bytes as int8, validation MAE 4.88 days Normalisation values are stored in `model/config.json`.
+**Current model:** hidden layers 32,32 (5 → 32 → 32 → 1), **1,281 params**, 1,216 MACs, 5,124 bytes as float32, 1,281 bytes as int8, validation MAE 4.90 days. Normalisation values are stored in `model/config.json`.
 
 ## 3. Repo layout
 
@@ -30,7 +30,8 @@ model/                 trained model (must be committed: the server loads it)
 test_api.py            our correctness check (ranges, timing keys, batch equals singles)
 batch_test.py          400 single calls against one batch call
 handshake_test.py      splits connection set-up into DNS, TCP, TLS
-docs/                  Mission 3 report
+docs/                  Mission reports (Missions 1-2, 3, 4)
+plots/                 generated plots (Missions 1-2, 4)
 results/               benchmark CSV files (evidence)
 ```
 
@@ -100,8 +101,8 @@ Counting rule: a `Linear(a, b)` layer has a×b weights plus b biases, a×b MACs 
 
 ## 7. Open items and risks
 
-1. **Model size not justified in the repo.** The committed model is 8,8 with validation MAE 6.15. A quick check on our data suggested a 32,32 network reaches about 5.0 (a rough sklearn estimate, not our code). The accuracy check compares us with "what a good small network gets", so ask the Mission 2 owner whether a size sweep was done. If the model changes: retrain, **commit `model/`**, restart uvicorn on the Codespace, and update the numbers in this file and the report.
-2. **Consistency check.** `/health`'s `params` must equal `/model_info`'s `total_params`. They do for 8,8 (129). Re-check after any retrain.
+1. **Model size justified in the repo.** The final model is 32,32 (5 → 32 → 32 → 1) with 1,281 parameters and validation MAE 4.90 days (historical sweep: 4.89 days). The size sweep and plots are documented in `docs/mission1_2_report.md` and `plots/`.
+2. **Consistency check.** `/health`'s `params` must equal `/model_info`'s `total_params`. They match for 32,32 (1,281).
 3. **Home-router DNS problems.** One laptop's router (Jio) sometimes refused DNS lookups, which crashed benchmark runs. Fixes: set DNS to 8.8.8.8 and 1.1.1.1, or use a phone hotspot.
 4. **Do not edit the same file in two places** (laptop and Codespace). Pull before you edit, push after.
 5. **Do not commit `venv/`.** Add `venv/` and `.venv/` to `.gitignore`.
