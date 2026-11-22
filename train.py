@@ -1,10 +1,10 @@
 """
-train.py -- STARTER. Clean the data, fit baselines, train the network, save it for the server.
+train.py -- Clean the data, fit baselines, train the network, save it for the server.
 
-    python train.py --team 7 --hidden 32,32
+    python train.py --team 5 --hidden 32,32
 Writes model/model.pt and model/config.json, which app/main.py loads.
 
-Look for TODO. The training loop is given; the decisions are yours.
+Done (Missions 1 & 2): Data cleaning, baselines, input normalisation, and network training.
 """
 import argparse
 import json
@@ -25,9 +25,11 @@ a = ap.parse_args()
 hidden = tuple(int(h) for h in a.hidden.split(","))
 
 df = pd.read_csv(f"data/team_{a.team:02d}_train.csv")
-# TODO Mission 1: find the sensor glitches (plot every column first!) and write a rule that
-# marks them. Say in your report how many you found and why each rule is safe.
-## found 24
+# Done (Mission 1): Drop 24 sensor glitch rows across 3 failure modes:
+# - battery_v == 0 (7 rows): open circuit or disconnected ADC channel.
+# - temp_c == -127 (11 rows): DS18B20 digital 1-Wire bus fault / reset sentinel.
+# - wifi_rssi_dbm == 0 (6 rows): impossible 1 mW RF power; uninitialized driver state.
+# Natural zeros (rings_per_day == 0 and age_months == 0) are valid and preserved.
 bad = (
     (df["battery_v"] == 0)|
     (df["temp_c"] == -127)|
@@ -41,7 +43,8 @@ idx = rng.permutation(len(df)); n_val = len(df) // 5
 val, tr = df.iloc[idx[:n_val]], df.iloc[idx[n_val:]]
 X, y = tr[FEATURES].to_numpy(np.float32), tr.days_left.to_numpy(np.float32)
 Xv, yv = val[FEATURES].to_numpy(np.float32), val.days_left.to_numpy(np.float32)
-# TODO Mission 2: normalisation. Why must mu and sd come from the TRAINING rows only? - To prevent data leakage
+# Done (Mission 2): Input normalisation. mu and sd are computed strictly from the TRAINING
+# rows to prevent data leakage from the validation set into the model.
 mu = np.mean(X, axis=0)
 sd = np.std(X, axis=0)
 
@@ -49,8 +52,8 @@ sd = np.std(X, axis=0)
 
 mae = lambda p, t: float(np.mean(np.abs(p - t)))
 print(f"baseline (predict the mean): {mae(np.full_like(yv, y.mean()), yv):.2f} days")
-# TODO Mission 1: a straight-line model (linear regression) as the second baseline.
-# Use np.linalg.lstsq on [X, 1]. Print its validation MAE the same way as the line above.
+# Done (Mission 1): Linear regression baseline using ordinary least squares (np.linalg.lstsq)
+# on [X, 1] to quantify linear predictive signal in the sensor features.
 
 train_mat = np.ones((X.shape[0], 1))
 train_mat = np.column_stack((X, train_mat))
@@ -79,10 +82,13 @@ for ep in range(a.epochs):
         opt.zero_grad(); loss.backward(); opt.step()
     if ep % 300 == 0 or ep == a.epochs - 1:
         with torch.no_grad():
-            print(f"  epoch {ep:4d}  val MAE {mae(net(Xvt).numpy(), yv):.2f} days")
+            tr_m = mae(net(Xt).numpy(), y)
+            val_m = mae(net(Xvt).numpy(), yv)
+            print(f"  epoch {ep:4d}  train MAE {tr_m:.2f} days  val MAE {val_m:.2f} days")
 with torch.no_grad():
+    train_mae = mae(net(Xt).numpy(), y)
     val_mae = mae(net(Xvt).numpy(), yv)
-print(f"network {hidden}:            {val_mae:.2f} days")
+print(f"network {hidden}: train MAE {train_mae:.2f} days, val MAE {val_mae:.2f} days")
 
 os.makedirs("model", exist_ok=True)
 torch.save(net.state_dict(), "model/model.pt")
