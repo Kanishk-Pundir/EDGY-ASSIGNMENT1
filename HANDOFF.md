@@ -82,7 +82,7 @@ The checker talks to the Codespace, so the server must run there.
 5. GitHub, Settings, Codespaces, Default idle timeout: set it to the maximum, and keep the Codespace tab open during the check window.
 
 Endpoint URL: `https://animated-guacamole-v6rpvvg5v9943w4wq-8000.app.github.dev` (stays the same for this Codespace; it changes if a new Codespace is created)
-Repo link: `https://github.com/Kanishk-Pundir/EDGY-MISSION-3`
+Repo link: `https://github.com/Kanishk-Pundir/EDGY-ASSIGNMENT1`
 
 **After changing `app/main.py` or `model/`:** commit, then restart uvicorn (Ctrl+C, run it again). It does not reload by itself.
 

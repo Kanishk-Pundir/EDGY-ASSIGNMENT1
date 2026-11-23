@@ -185,10 +185,10 @@ Without normalization, input gradients with respect to larger numerical features
 ## 6. Summary of Generated Artifacts
 
 The following artifacts have been generated and verified:
-- [mission1_feature_histograms.png](file:///home/bhavanish/.gemini/antigravity/scratch/EDGY-MISSION-3/plots/mission1_feature_histograms.png)
-- [mission1_days_left_vs_features.png](file:///home/bhavanish/.gemini/antigravity/scratch/EDGY-MISSION-3/plots/mission1_days_left_vs_features.png)
-- [mission1_linear_regression_pred_vs_true.png](file:///home/bhavanish/.gemini/antigravity/scratch/EDGY-MISSION-3/plots/mission1_linear_regression_pred_vs_true.png)
-- [mission2_architecture_sweep_mae_vs_params.png](file:///home/bhavanish/.gemini/antigravity/scratch/EDGY-MISSION-3/plots/mission2_architecture_sweep_mae_vs_params.png)
-- [mission2_normalization_comparison.png](file:///home/bhavanish/.gemini/antigravity/scratch/EDGY-MISSION-3/plots/mission2_normalization_comparison.png)
-- [config.json](file:///home/bhavanish/.gemini/antigravity/scratch/EDGY-MISSION-3/model/config.json)
-- [model.pt](file:///home/bhavanish/.gemini/antigravity/scratch/EDGY-MISSION-3/model/model.pt)
+- [mission1_feature_histograms.png]
+- [mission1_days_left_vs_features.png]
+- [mission1_linear_regression_pred_vs_true.png]
+- [mission2_architecture_sweep_mae_vs_params.png]
+- [mission2_normalization_comparison.png]
+- [config.json]
+- [model.pt]
