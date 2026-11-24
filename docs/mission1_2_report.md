@@ -71,7 +71,7 @@ As shown in the scatter plots above:
 All modeling experiments use the exact deterministic 80/20 train/validation split defined in `train.py` (`np.random.default_rng(0)`, 395 validation rows, 1,581 training rows).
 
 ### 3.1 Mean Baseline
-- **Strategy:** Predict the scalar mean of the training target ($\bar{y} \approx 68.61$ days) for all validation inputs.
+- **Strategy:** Predict the scalar mean of the training target ($\bar{y} \approx 80.54$ days) for all validation inputs.
 - **Validation MAE:** **57.27 days**.
 - **Analysis:** This serves as the naive baseline. Any predictive model must substantially outperform 57.27 days to demonstrate predictive utility.
 
@@ -107,7 +107,7 @@ A comprehensive sweep over hidden layer depth and width was conducted using the 
 
 ### 4.2 Fresh Retraining Run Verification
 
-Executing the unmodified training script:
+Executing the training script:
 ```bash
 python train.py --team 5 --hidden 32,32
 ```
@@ -118,9 +118,7 @@ produced:
 - **Parameters:** 1,281.
 
 > [!NOTE]
-> **Training Script Output & Verified Training MAE:**
-> `train.py` evaluates and prints only validation MAE during execution (`mae(net(Xvt).numpy(), yv)`). In accordance with the strict code-change restriction, `train.py` was not modified.
-> To verify the training performance without altering `train.py`, the saved `32,32` model (`model/model.pt` and `model/config.json`) was evaluated on the identical cleaned training split (1,581 samples) using the saved normalization constants (`mu`, `sd`). The measured training MAE is **4.63 days** (4.6262 days) with a validation MAE of **4.90 days** (4.8965 days), confirming the historical training metrics.
+> `train.py` prints both training and validation MAE every 300 epochs and at the end of training. As an independent check, the saved `32,32` model (`model/model.pt` and `model/config.json`) was also evaluated on the identical cleaned training split (1,581 samples) using the saved normalization constants (`mu`, `sd`). The measured training MAE is **4.63 days** (4.6262 days) with a validation MAE of **4.90 days** (4.8965 days), confirming the historical training metrics..
 
 ![Architecture Sweep MAE vs Params](../plots/mission2_architecture_sweep_mae_vs_params.png)
 
@@ -134,7 +132,7 @@ produced:
 
 Although `5 → 64 → 64 → 1` achieved a marginally lower validation MAE of 4.87 days:
 - It requires **4,609 parameters**—over **3.6× more parameters** than `32,32`.
-- It requires **4,416 MACs** per inference compared to **1,216 MACs** for `32,32` (a 3.63× computational increase).
+- It requires **4,480 MACs** per inference compared to **1,216 MACs** for `32,32` (a 3.68× computational increase).
 - The validation MAE improvement is a negligible **0.02 days** (~28 minutes over a multi-month battery lifespan), which is well within stochastic training noise and does not justify the 3.6× memory and computation penalty on an embedded IoT device.
 
 ### 4.5 Analysis of Shallow Network Failures (Single-Hidden-Layer 8, 16, 64)
@@ -174,9 +172,9 @@ To evaluate the impact of input feature standardization:
 As shown in the convergence trajectories above, the normalized network rapidly converges, dropping below 10 days within 100 epochs and stabilizing at 4.90 days. The unnormalized network struggles throughout training and plateaus at 13.70 days—nearly **2.8× higher error**.
 
 The raw sensor features vary across widely divergent scales:
-- `battery_v`: ranges from 2.5 V to 4.5 V ($\mu \approx 3.78$, $\sigma \approx 0.24$).
-- `wifi_rssi_dbm`: ranges from -100 dBm to -10 dBm ($\mu \approx -66.40$, $\sigma \approx 12.51$).
-- `temp_c`: ranges from -40 °C to 85 °C ($\mu \approx 28.18$, $\sigma \approx 6.91$).
+- `battery_v`: ranges from 3.35 V to 4.20 V in the cleaned data ($\mu \approx 3.78$, $\sigma \approx 0.24$).
+- `wifi_rssi_dbm`: ranges from -88 dBm to -45 dBm in the cleaned data ($\mu \approx -66.40$, $\sigma \approx 12.51$).
+- `temp_c`: ranges from 8 °C to 46 °C in the cleaned data ($\mu \approx 28.18$, $\sigma \approx 6.91$).
 
 Without normalization, input gradients with respect to larger numerical features (`wifi_rssi_dbm` and `temp_c`) dominate parameter updates, while the critical but numerically small variations in `battery_v` (where a 0.1 V drop indicates significant discharge) receive disproportionately small gradient signals. Standardizing each feature to zero mean and unit variance ensures isotropic loss contours and well-conditioned gradient descent.
 
